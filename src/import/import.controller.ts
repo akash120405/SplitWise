@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
+import { parseCsv } from "./import.service";
 
-export const uploadCsv = (req: Request, res: Response) => {
+export const uploadCsv = async (
+  req: Request,
+  res: Response
+) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -9,17 +13,19 @@ export const uploadCsv = (req: Request, res: Response) => {
       });
     }
 
+    const rows = await parseCsv(req.file.path);
+
     return res.status(200).json({
-      success: true,
-      filename: req.file.originalname,
-      size: req.file.size,
-    });
+    success: true,
+    totalRows: rows.length,
+    firstRow: rows[0],
+});
   } catch (error) {
     console.error(error);
 
     return res.status(500).json({
       success: false,
-      message: "Upload failed",
+      message: "Import failed",
     });
   }
 };
