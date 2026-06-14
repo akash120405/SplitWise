@@ -6,10 +6,10 @@ export const getSettlements = async (
   res: Response
 ) => {
   try {
-    const { groupId } = req.params;
+    const groupId = req.params.groupId as string;
 
     const settlements =
-      await generateSettlements(groupId);
+        await generateSettlements(groupId);
 
     return res.json({
       success: true,
