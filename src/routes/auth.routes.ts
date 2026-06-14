@@ -1,27 +1,14 @@
 import { Router } from "express";
 
 import {
-  createGroup,
-  addMember,
-  leaveGroup,
-} from "../controllers/group.controller";
-
-import { protect } from "../middleware/auth.middleware";
+  register,
+  login,
+} from "../controllers/auth.controller";
 
 const router = Router();
 
-router.post("/", protect, createGroup);
+router.post("/register", register);
 
-router.post(
-  "/:groupId/members",
-  protect,
-  addMember
-);
-
-router.patch(
-  "/:groupId/members/:userId/leave",
-  protect,
-  leaveGroup
-);
+router.post("/login", login);
 
 export default router;
