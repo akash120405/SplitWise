@@ -7,137 +7,104 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum SplitType {
-  EQUAL
-  UNEQUAL
-  PERCENTAGE
-  SHARE
-}
-
 model User {
-  id       String @id @default(uuid())
-  name     String
-  email    String @unique
-  password String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  groupMembers GroupMember[]
-  expensesPaid Expense[]     @relation("ExpensePayer")
-
-  settlementsSent     Settlement[] @relation("Payer")
-  settlementsReceived Settlement[] @relation("Receiver")
-
-  expenseParticipations ExpenseParticipant[]
+  id                    String               @id @default(uuid())
+  name                  String
+  email                 String               @unique
+  password              String
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  expensesPaid          Expense[]            @relation("ExpensePayer")
   messages              ExpenseMessage[]
+  expenseParticipations ExpenseParticipant[]
+  groupMembers          GroupMember[]
+  settlementsSent       Settlement[]         @relation("Payer")
+  settlementsReceived   Settlement[]         @relation("Receiver")
 }
 
 model Group {
-  id   String @id @default(uuid())
-  name String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  members  GroupMember[]
-  expenses Expense[]
+  id        String        @id @default(uuid())
+  name      String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  expenses  Expense[]
+  members   GroupMember[]
 }
 
 model GroupMember {
-  id String @id @default(uuid())
-
-  groupId String
-  userId  String
-
+  id       String    @id @default(uuid())
+  groupId  String
+  userId   String
   joinedAt DateTime  @default(now())
   leftAt   DateTime?
-
-  isActive Boolean @default(true)
-
-  group Group @relation(fields: [groupId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
+  isActive Boolean   @default(true)
+  group    Group     @relation(fields: [groupId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
 
   @@index([groupId, userId])
 }
 
 model Expense {
-  id String @id @default(uuid())
-
-  title  String
-  amount Decimal @db.Decimal(10, 2)
-
-  splitType SplitType
-
-  groupId  String
-  paidById String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  group  Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  paidBy User  @relation("ExpensePayer", fields: [paidById], references: [id])
-
-  anomalies Anomaly[] @relation("ExpenseAnomalies")
-
-  participants ExpenseParticipant[]
+  id           String               @id @default(uuid())
+  title        String
+  amount       Decimal              @db.Decimal(10, 2)
+  splitType    SplitType
+  groupId      String
+  paidById     String
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  anomalies    Anomaly[]            @relation("ExpenseAnomalies")
+  group        Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  paidBy       User                 @relation("ExpensePayer", fields: [paidById], references: [id])
   messages     ExpenseMessage[]
+  participants ExpenseParticipant[]
 }
 
 model ExpenseParticipant {
-  id String @id @default(uuid())
-
-  expenseId String
-  userId    String
-
+  id         String  @id @default(uuid())
+  expenseId  String
+  userId     String
   owedAmount Decimal @db.Decimal(10, 2)
-
-  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id])
+  expense    Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id])
 
   @@unique([expenseId, userId])
 }
 
 model Settlement {
-  id String @id @default(uuid())
-
+  id         String   @id @default(uuid())
   payerId    String
   receiverId String
-
-  amount Decimal @db.Decimal(10, 2)
-
-  createdAt DateTime @default(now())
-
-  payer    User @relation("Payer", fields: [payerId], references: [id])
-  receiver User @relation("Receiver", fields: [receiverId], references: [id])
+  amount     Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  payer      User     @relation("Payer", fields: [payerId], references: [id])
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
 }
 
 model Anomaly {
-  id String @id @default(uuid())
-
-  expenseId String?
-
-  type     String
-  severity String
-
+  id          String   @id @default(uuid())
+  expenseId   String?
+  type        String
+  severity    String
   description String
   actionTaken String
-
-  createdAt DateTime @default(now())
-
-  expense Expense? @relation("ExpenseAnomalies", fields: [expenseId], references: [id])
+  createdAt   DateTime @default(now())
+  expense     Expense? @relation("ExpenseAnomalies", fields: [expenseId], references: [id])
 }
 
 model ExpenseMessage {
-  id String @id @default(uuid())
-
+  id        String   @id @default(uuid())
   expenseId String
   userId    String
-
-  message String
-
+  message   String
   createdAt DateTime @default(now())
+  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+}
 
-  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id])
+enum SplitType {
+  EQUAL
+  UNEQUAL
+  PERCENTAGE
+  SHARE
 }

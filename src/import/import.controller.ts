@@ -1,9 +1,14 @@
 import { Request, Response } from "express";
+
 import { parseCsv } from "./import.service";
 import { validateRow } from "./validators";
 import { detectDuplicates } from "./detectDuplicates";
 
-console.log("validateRow =", validateRow);
+import { findOrCreateUser } from "./user.service";
+import { getImportGroup } from "./group.service";
+import { createExpense } from "./expense.service";
+import { createParticipants } from "./participant.service";
+
 export const uploadCsv = async (
   req: Request,
   res: Response
@@ -18,44 +23,162 @@ export const uploadCsv = async (
 
     const rows = await parseCsv(req.file.path);
 
-   const report = {
-  processed: rows.length,
-  imported: 0,
-  warnings: 0,
-  errors: 0,
-  anomalies: [] as any[],
-};
-const duplicates = detectDuplicates(rows);
+    const importGroup =
+      await getImportGroup();
 
-report.anomalies.push(...duplicates);
-report.warnings += duplicates.length;
+    // ----------------------------
+    // Create Users
+    // ----------------------------
 
-rows.forEach((row, index) => {
-  const rowAnomalies = validateRow(row, index + 1);
+    const users = new Set<string>();
 
-  report.anomalies.push(...rowAnomalies);
+    rows.forEach((row) => {
+      if (row.paid_by) {
+        users.add(row.paid_by.trim());
+      }
 
-  rowAnomalies.forEach((anomaly) => {
-    if (anomaly.severity === "ERROR") {
-      report.errors++;
-    } else {
-      report.warnings++;
+      if (row.split_with) {
+        row.split_with
+          .split(";")
+          .forEach((name: string) => {
+            users.add(name.trim());
+          });
+      }
+    });
+
+    for (const userName of users) {
+      await findOrCreateUser(userName);
     }
-  });
 
-  const hasError = rowAnomalies.some(
-  (a) => a.severity === "ERROR"
-);
+    // ----------------------------
+    // Create Expenses + Participants
+    // ----------------------------
 
-if (!hasError) {
-  report.imported++;
-}
-});
+    let expensesCreated = 0;
 
-return res.status(200).json({
-  success: true,
-  report,
-});
+    for (const row of rows) {
+      const rowAnomalies = validateRow(
+        row,
+        0
+      );
+
+      const hasError =
+        rowAnomalies.some(
+          (a) => a.severity === "ERROR"
+        );
+
+      if (hasError) {
+        continue;
+      }
+
+      try {
+        const payer =
+          await findOrCreateUser(
+            row.paid_by
+          );
+
+        const expense =
+          await createExpense(
+            row,
+            payer.id,
+            importGroup.id
+          );
+
+        const amount = Number(
+          String(row.amount).replace(
+            /,/g,
+            ""
+          )
+        );
+
+        await createParticipants(
+          expense.id,
+          row.split_with,
+          amount
+        );
+
+        console.log(
+          "✅ Expense created:",
+          expense.title
+        );
+
+        expensesCreated++;
+      } catch (err) {
+        console.error(
+          "❌ Failed expense:",
+          row.description
+        );
+
+        console.error(err);
+      }
+    }
+
+    // ----------------------------
+    // Build Report
+    // ----------------------------
+
+    const report = {
+      processed: rows.length,
+      imported: 0,
+      warnings: 0,
+      errors: 0,
+      anomalies: [] as any[],
+    };
+
+    const duplicates =
+      detectDuplicates(rows);
+
+    report.anomalies.push(
+      ...duplicates
+    );
+
+    report.warnings +=
+      duplicates.length;
+
+    rows.forEach(
+      (row, index) => {
+        const rowAnomalies =
+          validateRow(
+            row,
+            index + 1
+          );
+
+        report.anomalies.push(
+          ...rowAnomalies
+        );
+
+        rowAnomalies.forEach(
+          (anomaly) => {
+            if (
+              anomaly.severity ===
+              "ERROR"
+            ) {
+              report.errors++;
+            } else {
+              report.warnings++;
+            }
+          }
+        );
+
+        const hasError =
+          rowAnomalies.some(
+            (a) =>
+              a.severity ===
+              "ERROR"
+          );
+
+        if (!hasError) {
+          report.imported++;
+        }
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      usersImported: users.size,
+      expensesCreated,
+      report,
+    });
   } catch (error) {
     console.error(error);
 
