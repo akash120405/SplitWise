@@ -9,7 +9,8 @@ import { getImportGroup } from "./group.service";
 import { createExpense } from "./expense.service";
 import { createParticipants } from "./participant.service";
 import { saveAnomaly } from "./anomaly.service";
-
+import { addUserToGroup }
+from "./groupMember.service";
 export const uploadCsv = async (
   req: Request,
   res: Response
@@ -52,8 +53,14 @@ export const uploadCsv = async (
     });
 
     for (const userName of users) {
-      await findOrCreateUser(userName);
-    }
+  const user =
+    await findOrCreateUser(userName);
+
+  await addUserToGroup(
+    user.id,
+    importGroup.id
+  );
+}
 
     // ----------------------------
     // Create Expenses + Participants
