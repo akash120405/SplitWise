@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { parseCsv } from "./import.service";
-
+import { validateRow } from "./validators";
 export const uploadCsv = async (
   req: Request,
   res: Response
@@ -15,10 +15,35 @@ export const uploadCsv = async (
 
     const rows = await parseCsv(req.file.path);
 
-    return res.status(200).json({
-    success: true,
-    totalRows: rows.length,
-    firstRow: rows[0],
+   const report = {
+  processed: rows.length,
+  imported: 0,
+  warnings: 0,
+  errors: 0,
+  anomalies: [] as any[],
+};
+
+rows.forEach((row, index) => {
+  const rowAnomalies = validateRow(row, index + 1);
+
+  report.anomalies.push(...rowAnomalies);
+
+  rowAnomalies.forEach((anomaly) => {
+    if (anomaly.severity === "ERROR") {
+      report.errors++;
+    } else {
+      report.warnings++;
+    }
+  });
+
+  if (rowAnomalies.length === 0) {
+    report.imported++;
+  }
+});
+
+return res.status(200).json({
+  success: true,
+  report,
 });
   } catch (error) {
     console.error(error);
