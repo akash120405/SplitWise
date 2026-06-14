@@ -1,13 +1,110 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String               @id @default(uuid())
+  name                  String
+  email                 String               @unique
+  password              String
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  expensesPaid          Expense[]            @relation("ExpensePayer")
+  messages              ExpenseMessage[]
+  expenseParticipations ExpenseParticipant[]
+  groupMembers          GroupMember[]
+  settlementsSent       Settlement[]         @relation("Payer")
+  settlementsReceived   Settlement[]         @relation("Receiver")
+}
+
+model Group {
+  id        String        @id @default(uuid())
+  name      String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  expenses  Expense[]
+  members   GroupMember[]
+}
+
+model GroupMember {
+  id       String    @id @default(uuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+  isActive Boolean   @default(true)
+  group    Group     @relation(fields: [groupId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@index([groupId, userId])
+}
+
+model Expense {
+  id           String               @id @default(uuid())
+  title        String
+  amount       Decimal              @db.Decimal(10, 2)
+  splitType    SplitType
+  groupId      String
+  paidById     String
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  anomalies    Anomaly[]            @relation("ExpenseAnomalies")
+  group        Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  paidBy       User                 @relation("ExpensePayer", fields: [paidById], references: [id])
+  messages     ExpenseMessage[]
+  participants ExpenseParticipant[]
+}
+
+model ExpenseParticipant {
+  id         String  @id @default(uuid())
+  expenseId  String
+  userId     String
+  owedAmount Decimal @db.Decimal(10, 2)
+  expense    Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+}
+
+model Settlement {
+  id         String   @id @default(uuid())
+  payerId    String
+  receiverId String
+  amount     Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  payer      User     @relation("Payer", fields: [payerId], references: [id])
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+}
+
+model Anomaly {
+  id          String   @id @default(uuid())
+  expenseId   String?
+  type        String
+  severity    String
+  description String
+  actionTaken String
+  createdAt   DateTime @default(now())
+  expense     Expense? @relation("ExpenseAnomalies", fields: [expenseId], references: [id])
+}
+
+model ExpenseMessage {
+  id        String   @id @default(uuid())
+  expenseId String
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+enum SplitType {
+  EQUAL
+  UNEQUAL
+  PERCENTAGE
+  SHARE
 }
