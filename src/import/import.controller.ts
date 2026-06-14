@@ -8,6 +8,7 @@ import { findOrCreateUser } from "./user.service";
 import { getImportGroup } from "./group.service";
 import { createExpense } from "./expense.service";
 import { createParticipants } from "./participant.service";
+import { saveAnomaly } from "./anomaly.service";
 
 export const uploadCsv = async (
   req: Request,
@@ -20,6 +21,10 @@ export const uploadCsv = async (
         message: "No file uploaded",
       });
     }
+
+    // ----------------------------
+    // Parse CSV
+    // ----------------------------
 
     const rows = await parseCsv(req.file.path);
 
@@ -97,11 +102,6 @@ export const uploadCsv = async (
           amount
         );
 
-        console.log(
-          "✅ Expense created:",
-          expense.title
-        );
-
         expensesCreated++;
       } catch (err) {
         console.error(
@@ -125,6 +125,8 @@ export const uploadCsv = async (
       anomalies: [] as any[],
     };
 
+    // Duplicate Detection
+
     const duplicates =
       detectDuplicates(rows);
 
@@ -135,43 +137,57 @@ export const uploadCsv = async (
     report.warnings +=
       duplicates.length;
 
-    rows.forEach(
-      (row, index) => {
-        const rowAnomalies =
-          validateRow(
-            row,
-            index + 1
-          );
+    for (const anomaly of duplicates) {
+      await saveAnomaly(anomaly);
+    }
 
-        report.anomalies.push(
-          ...rowAnomalies
+    // Row Validation
+
+    for (
+      let index = 0;
+      index < rows.length;
+      index++
+    ) {
+      const row = rows[index];
+
+      const rowAnomalies =
+        validateRow(
+          row,
+          index + 1
         );
 
-        rowAnomalies.forEach(
-          (anomaly) => {
-            if (
-              anomaly.severity ===
-              "ERROR"
-            ) {
-              report.errors++;
-            } else {
-              report.warnings++;
-            }
-          }
-        );
+      report.anomalies.push(
+        ...rowAnomalies
+      );
 
-        const hasError =
-          rowAnomalies.some(
-            (a) =>
-              a.severity ===
-              "ERROR"
-          );
-
-        if (!hasError) {
-          report.imported++;
-        }
+      for (const anomaly of rowAnomalies) {
+        await saveAnomaly(anomaly);
       }
-    );
+
+      rowAnomalies.forEach(
+        (anomaly) => {
+          if (
+            anomaly.severity ===
+            "ERROR"
+          ) {
+            report.errors++;
+          } else {
+            report.warnings++;
+          }
+        }
+      );
+
+      const hasError =
+        rowAnomalies.some(
+          (a) =>
+            a.severity ===
+            "ERROR"
+        );
+
+      if (!hasError) {
+        report.imported++;
+      }
+    }
 
     return res.status(200).json({
       success: true,
