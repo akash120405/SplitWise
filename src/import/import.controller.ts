@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { parseCsv } from "./import.service";
 import { validateRow } from "./validators";
+import { detectDuplicates } from "./detectDuplicates";
+
+console.log("validateRow =", validateRow);
 export const uploadCsv = async (
   req: Request,
   res: Response
@@ -22,6 +25,10 @@ export const uploadCsv = async (
   errors: 0,
   anomalies: [] as any[],
 };
+const duplicates = detectDuplicates(rows);
+
+report.anomalies.push(...duplicates);
+report.warnings += duplicates.length;
 
 rows.forEach((row, index) => {
   const rowAnomalies = validateRow(row, index + 1);
