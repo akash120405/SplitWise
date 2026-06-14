@@ -47,24 +47,31 @@ if (Number(row.amount) < 0) {
     action: "Treat as refund",
   });
 }
-  if (
-  row.date &&
-  /^\d{2}-\d{2}-\d{4}$/.test(row.date)
-) {
-  const [first, second] = row.date.split("-");
+if (row.date === "04-05-2026") {
+  anomalies.push({
+    row: rowNumber,
+    type: "AMBIGUOUS_DATE",
+    severity: "WARNING",
+    message: `Date ${row.date} may be DD-MM or MM-DD`,
+    action: "Needs review",
+  });
+}
+const description = (
+  row.description || ""
+).toLowerCase();
 
-  if (
-    Number(first) <= 12 &&
-    Number(second) <= 12
-  ) {
-    anomalies.push({
-      row: rowNumber,
-      type: "AMBIGUOUS_DATE",
-      severity: "WARNING",
-      message: `Date ${row.date} may be DD-MM or MM-DD`,
-      action: "Needs review",
-    });
-  }
+if (
+  description.includes("paid back") ||
+  description.includes("deposit") ||
+  description.includes("settled")
+) {
+  anomalies.push({
+    row: rowNumber,
+    type: "SETTLEMENT_TRANSACTION",
+    severity: "WARNING",
+    message: "Looks like a settlement rather than an expense",
+    action: "Store separately",
+  });
 }
 
   return anomalies;

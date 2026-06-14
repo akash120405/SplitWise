@@ -43,9 +43,13 @@ rows.forEach((row, index) => {
     }
   });
 
-  if (rowAnomalies.length === 0) {
-    report.imported++;
-  }
+  const hasError = rowAnomalies.some(
+  (a) => a.severity === "ERROR"
+);
+
+if (!hasError) {
+  report.imported++;
+}
 });
 
 return res.status(200).json({
