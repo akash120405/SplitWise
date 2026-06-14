@@ -1,5 +1,5 @@
 export const detectDuplicates = (rows: any[]) => {
-  const duplicates = [];
+  const duplicates: any[] = [];
   const seen = new Map();
 
   rows.forEach((row, index) => {

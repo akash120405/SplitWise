@@ -6,10 +6,10 @@ export const getBalances = async (
   res: Response
 ) => {
   try {
-    const { groupId } = req.params;
+    const groupId = req.params.groupId as string;
 
-    const balances =
-      await calculateGroupBalances(groupId);
+const balances =
+  await calculateGroupBalances(groupId);
 
     return res.status(200).json({
       success: true,
